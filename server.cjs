@@ -1,0 +1,64 @@
+// backend/server.cjs
+// Express server to automate web push notifications on number update
+
+const express = require('express');
+const webpush = require('web-push');
+const admin = require('firebase-admin');
+const { getDatabase } = require('firebase-admin/database');
+
+// --- CONFIG ---
+const PORT = process.env.PORT || 3000;
+const DB_URL = 'https://rahul-game-4f817-default-rtdb.firebaseio.com/';
+const VAPID_PUBLIC_KEY = 'BPf9BmoCk9shYN5GSDT1bROW76nus4SOFmBlzR3n5sSexXi_JZvjhBPsRPH6pQx1fueyX7gMkpOuc0H9tsqYMCo';
+const VAPID_PRIVATE_KEY = '06zpPnCs54KYx32M5t9l-rWMj_Nnjn3fW_ERAcyZe-M';
+const SERVICE_ACCOUNT = require('./serviceAccountKey.json'); // Place your Firebase Admin SDK key here
+
+// --- INIT ---
+admin.initializeApp({
+  credential: admin.credential.cert(SERVICE_ACCOUNT),
+  databaseURL: DB_URL,
+});
+const db = getDatabase();
+
+webpush.setVapidDetails(
+  'mailto:your-email@example.com',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
+
+const app = express();
+
+// --- LISTEN FOR NUMBER UPDATES ---
+// Change this path to your actual numbers path if needed
+db.ref('numbers').on('child_changed', async (snapshot) => {
+  const updatedData = snapshot.val();
+  const key = snapshot.key;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  // Only send if the update is for today
+  if (updatedData && updatedData.date === today) {
+    const title = 'Number Updated!';
+    const body = `Admin updated number for ${today}: ${updatedData.value || ''}`;
+    // Send to all subscriptions
+    const subsSnap = await db.ref('webPushSubscriptions').once('value');
+    const subsObj = subsSnap.val();
+    if (!subsObj) return;
+    const subs = Object.values(subsObj);
+    const payload = JSON.stringify({ title, body });
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        console.error('Failed to send to a subscription:', err.message);
+      }
+    }
+    console.log(`Notification sent for number update on ${today}`);
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('Web Push Notification Server is running.');
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
