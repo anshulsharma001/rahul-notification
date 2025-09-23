@@ -34,14 +34,23 @@ app.use(cors());
 // Listen for changes under /sattanamee/{name}/{date}
 db.ref('sattanamee').on('child_changed', (snapshot) => {
   const sattaname = snapshot.key;
-  snapshot.forEach(dateSnap => {
-    const dateKey = dateSnap.key;
-    const numberObj = dateSnap.val();
+  // Only get the changed child (date)
+  const changed = snapshot.ref.parent ? snapshot.ref.key : null;
+  // If changed is not null, only process that date
+  if (changed) {
+    const numberObj = snapshot.child(changed).val();
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    if (dateKey === today && numberObj && numberObj.number) {
-      sendNumberNotification(sattaname, dateKey, numberObj.number);
+    if (changed === today && numberObj && numberObj.number) {
+      sendNumberNotification(sattaname, changed, numberObj.number);
     }
-  });
+  } else {
+    // Fallback: process only today's date
+    const today = new Date().toISOString().slice(0, 10);
+    const numberObj = snapshot.child(today).val();
+    if (numberObj && numberObj.number) {
+      sendNumberNotification(sattaname, today, numberObj.number);
+    }
+  }
 });
 
 // Helper to send notification
