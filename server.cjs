@@ -31,31 +31,37 @@ const app = express();
 app.use(cors());
 
 // --- LISTEN FOR NUMBER UPDATES ---
-// Change this path to your actual numbers path if needed
-db.ref('numbers').on('child_changed', async (snapshot) => {
-  const updatedData = snapshot.val();
-  const key = snapshot.key;
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  // Only send if the update is for today
-  if (updatedData && updatedData.date === today) {
-    const title = 'Number Updated!';
-    const body = `Admin updated number for ${today}: ${updatedData.value || ''}`;
-    // Send to all subscriptions
-    const subsSnap = await db.ref('webPushSubscriptions').once('value');
-    const subsObj = subsSnap.val();
-    if (!subsObj) return;
-    const subs = Object.values(subsObj);
-    const payload = JSON.stringify({ title, body });
-    for (const sub of subs) {
-      try {
-        await webpush.sendNotification(sub, payload);
-      } catch (err) {
-        console.error('Failed to send to a subscription:', err.message);
-      }
+// Listen for changes under /sattanamee/{name}/{date}
+db.ref('sattanamee').on('child_changed', (snapshot) => {
+  const sattaname = snapshot.key;
+  snapshot.forEach(dateSnap => {
+    const dateKey = dateSnap.key;
+    const numberObj = dateSnap.val();
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    if (dateKey === today && numberObj && numberObj.number) {
+      sendNumberNotification(sattaname, dateKey, numberObj.number);
     }
-    console.log(`Notification sent for number update on ${today}`);
-  }
+  });
 });
+
+// Helper to send notification
+async function sendNumberNotification(sattaname, date, number) {
+  const title = 'Number Updated!';
+  const body = `Admin updated number for ${sattaname} on ${date}: ${number}`;
+  const subsSnap = await db.ref('webPushSubscriptions').once('value');
+  const subsObj = subsSnap.val();
+  if (!subsObj) return;
+  const subs = Object.values(subsObj);
+  const payload = JSON.stringify({ title, body });
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (err) {
+      console.error('Failed to send to a subscription:', err.message);
+    }
+  }
+  console.log(`Notification sent for number update on ${date} (${sattaname})`);
+}
 
 app.get('/', (req, res) => {
   res.send('Web Push Notification Server is running.');
