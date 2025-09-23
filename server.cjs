@@ -93,10 +93,15 @@ app.get('/send-test', async (req, res) => {
   const subsSnap = await db.ref('webPushSubscriptions').once('value');
   const subsObj = subsSnap.val();
   if (!subsObj) return res.status(200).send('No subscribers found.');
-  const subs = Object.values(subsObj);
+  // Deduplicate by endpoint
+  const endpointMap = {};
+  Object.values(subsObj).forEach(sub => {
+    if (sub.endpoint) endpointMap[sub.endpoint] = sub;
+  });
+  const uniqueSubs = Object.values(endpointMap);
   const payload = JSON.stringify({ title, body });
   let success = 0, fail = 0;
-  for (const sub of subs) {
+  for (const sub of uniqueSubs) {
     try {
       await webpush.sendNotification(sub, payload);
       success++;
