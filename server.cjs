@@ -31,21 +31,32 @@ const app = express();
 app.use(cors());
 
 // --- LISTEN FOR NUMBER UPDATES ---
-// Dynamically listen for all sattaname/date updates
-const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 const sattanameeRef = db.ref('sattanamee');
+
+// Helper to add a listener for a sattaname's dates
+function addDateListener(sattaname) {
+  db.ref(`sattanamee/${sattaname}`).on('child_changed', (dateSnap) => {
+    const date = dateSnap.key;
+    const numberObj = dateSnap.val();
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (always current)
+    console.log(`[Listener] ${sattaname} - ${date} changed. Today: ${today}`);
+    if (date === today && numberObj && numberObj.number) {
+      console.log(`[Notify] Sending notification for ${sattaname} ${date} number: ${numberObj.number}`);
+      sendNumberNotification(sattaname, date, numberObj.number);
+    }
+  });
+}
 
 // Listen for new sattaname keys
 sattanameeRef.on('child_added', (sattanameSnap) => {
   const sattaname = sattanameSnap.key;
-  // Listen for changes to any date under this sattaname
-  db.ref(`sattanamee/${sattaname}`).on('child_changed', (dateSnap) => {
-    const date = dateSnap.key;
-    const numberObj = dateSnap.val();
-    if (date === today && numberObj && numberObj.number) {
-      sendNumberNotification(sattaname, date, numberObj.number);
-    }
-  });
+  addDateListener(sattaname);
+});
+
+// Also add listeners for all existing sattaname keys at startup
+sattanameeRef.once('value', (snapshot) => {
+  const sattanameKeys = Object.keys(snapshot.val() || {});
+  sattanameKeys.forEach(addDateListener);
 });
 
 // Helper to send notification
