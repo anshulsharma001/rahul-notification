@@ -5,6 +5,7 @@ const express = require('express');
 const webpush = require('web-push');
 const admin = require('firebase-admin');
 const { getDatabase } = require('firebase-admin/database');
+const cors = require('cors');
 
 // --- CONFIG ---
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,7 @@ webpush.setVapidDetails(
 );
 
 const app = express();
+app.use(cors());
 
 // --- LISTEN FOR NUMBER UPDATES ---
 // Change this path to your actual numbers path if needed
