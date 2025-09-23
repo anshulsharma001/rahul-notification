@@ -59,6 +59,26 @@ app.get('/', (req, res) => {
   res.send('Web Push Notification Server is running.');
 });
 
+app.get('/send-test', async (req, res) => {
+  const title = 'Test Notification';
+  const body = 'This is a test notification from admin panel.';
+  const subsSnap = await db.ref('webPushSubscriptions').once('value');
+  const subsObj = subsSnap.val();
+  if (!subsObj) return res.status(200).send('No subscribers found.');
+  const subs = Object.values(subsObj);
+  const payload = JSON.stringify({ title, body });
+  let success = 0, fail = 0;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(sub, payload);
+      success++;
+    } catch (err) {
+      fail++;
+    }
+  }
+  res.status(200).send(`Notifications sent: ${success}, failed: ${fail}`);
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
