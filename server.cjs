@@ -31,18 +31,20 @@ const app = express();
 app.use(cors());
 
 // --- LISTEN FOR NUMBER UPDATES ---
-// Listen for changes under /sattanamee/{name}/{date}
-db.ref('sattanamee').once('value', (snapshot) => {
-  const sattanameKeys = Object.keys(snapshot.val() || {});
-  sattanameKeys.forEach((sattaname) => {
-    db.ref(`sattanamee/${sattaname}`).on('child_changed', (dateSnap) => {
-      const date = dateSnap.key;
-      const numberObj = dateSnap.val();
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      if (date === today && numberObj && numberObj.number) {
-        sendNumberNotification(sattaname, date, numberObj.number);
-      }
-    });
+// Dynamically listen for all sattaname/date updates
+const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+const sattanameeRef = db.ref('sattanamee');
+
+// Listen for new sattaname keys
+sattanameeRef.on('child_added', (sattanameSnap) => {
+  const sattaname = sattanameSnap.key;
+  // Listen for changes to any date under this sattaname
+  db.ref(`sattanamee/${sattaname}`).on('child_changed', (dateSnap) => {
+    const date = dateSnap.key;
+    const numberObj = dateSnap.val();
+    if (date === today && numberObj && numberObj.number) {
+      sendNumberNotification(sattaname, date, numberObj.number);
+    }
   });
 });
 
