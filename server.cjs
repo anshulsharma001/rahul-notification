@@ -47,7 +47,7 @@ db.ref('sattanamee').on('child_changed', (snapshot) => {
 // Helper to send notification
 async function sendNumberNotification(sattaname, date, number) {
   const title = 'Number Updated!';
-  const body = `Admin updated number for ${sattaname} on ${date}: ${number}`;
+  const body = `${sattaname} का आज का नंबर: ${number}`;
   const subsSnap = await db.ref('webPushSubscriptions').once('value');
   const subsObj = subsSnap.val();
   if (!subsObj) return;
