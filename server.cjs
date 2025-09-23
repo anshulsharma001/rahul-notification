@@ -66,16 +66,21 @@ async function sendNumberNotification(sattaname, date, number) {
   const subsSnap = await db.ref('webPushSubscriptions').once('value');
   const subsObj = subsSnap.val();
   if (!subsObj) return;
-  const subs = Object.values(subsObj);
+  // Deduplicate by endpoint
+  const endpointMap = {};
+  Object.values(subsObj).forEach(sub => {
+    if (sub.endpoint) endpointMap[sub.endpoint] = sub;
+  });
+  const uniqueSubs = Object.values(endpointMap);
   const payload = JSON.stringify({ title, body });
-  for (const sub of subs) {
+  for (const sub of uniqueSubs) {
     try {
       await webpush.sendNotification(sub, payload);
     } catch (err) {
       console.error('Failed to send to a subscription:', err.message);
     }
   }
-  console.log(`Notification sent for number update on ${date} (${sattaname})`);
+  console.log(`Notification sent for number update on ${date} (${sattaname}) to ${uniqueSubs.length} unique endpoints`);
 }
 
 app.get('/', (req, res) => {
